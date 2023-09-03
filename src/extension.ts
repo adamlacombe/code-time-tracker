@@ -20,7 +20,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(outputChannel);
   outputChannel.appendLine("Extension activated.");
 
-  let timerState: TimerState[] = context.workspaceState.get<TimerState[]>("timerState", []);
+  let timerState: TimerState[] = context.workspaceState.get<TimerState[]>("timerState", [{ seconds: 0, files: [], startDateTime: new Date().toISOString() }]);
   let elapsedSeconds = timerState.length ? timerState[0].seconds : 0;
 
   const inactivityTimeoutSeconds = vscode.workspace.getConfiguration("timer").get<number>("inactivityTimeoutSeconds") || 60;
@@ -74,12 +74,29 @@ export function activate(context: vscode.ExtensionContext) {
   setInterval(() => {
     const currentCommitSha = gitOps.getLatestCommitSha();
 
+    // if there isn't a time entry with a commit, this is a fresh install 
     let lastKnownCommitSha = timerState.find((state) => state.commit)?.commit?.sha || null;
 
     if (lastKnownCommitSha !== currentCommitSha) {
-      lastKnownCommitSha = currentCommitSha;
       const commitInfo = gitOps.getCommitInfo(currentCommitSha);
       const changedFiles = gitOps.getChangedFiles(currentCommitSha, timerState[0]);
+
+      if (!(timerState && timerState.length > 0)) {
+        return;
+      }
+
+      const currentCommitTime = new Date(commitInfo.date!).getTime();
+      const currentEntryStartTime = new Date(timerState[0].startDateTime).getTime();
+
+      // if current entry started after current commit, do nothing
+      // resolves issue when lastKnownCommitSha is null
+      // prevents an old commit from being applied to a fresh time entry
+      if (currentEntryStartTime > currentCommitTime) {
+        outputChannel.appendLine(`Current entry started after the current commit. Skipping...`);
+        return;
+      }
+
+      lastKnownCommitSha = currentCommitSha;
 
       if (timerState[0] && !timerState[0].commit) {
         timerState[0].commit = {
@@ -87,9 +104,10 @@ export function activate(context: vscode.ExtensionContext) {
           sha: lastKnownCommitSha,
           files: changedFiles
         };
+        timerState[0].endDateTime = new Date().toISOString();
       }
 
-      stateOps.updateAndSaveTimerState({ seconds: 0, files: [] });
+      stateOps.updateAndSaveTimerState({ seconds: 0, files: [], startDateTime: new Date().toISOString() });
       timerOps.resetTimer(context, timerStatusBarItem);
     }
   }, 30 * 1000);

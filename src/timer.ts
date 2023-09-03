@@ -30,6 +30,10 @@ export class TimerOperations {
 
     this.timer = setInterval(() => {
       this.elapsedSeconds++;
+      if (!(this.timerState && this.timerState.length > 0)) {
+        return;
+      }
+
       this.timerState[0].seconds = this.elapsedSeconds;
 
       statusBarItem.text = `Elapsed Time: ${this.elapsedSeconds}s`;

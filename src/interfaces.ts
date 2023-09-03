@@ -1,5 +1,7 @@
 export interface TimerState {
   seconds: number;
+  startDateTime: string;
+  endDateTime?: string;
   commit?: {
     sha?: string;
     message?: string;

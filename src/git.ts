@@ -16,7 +16,12 @@ export class GitOperations {
     }
   }
 
-  getCommitInfo(commitSha: string) {
+  getCommitInfo(commitSha: string): {
+    commit?: string,
+    author?: string,
+    date?: string,
+    message?: string
+  } {
     const command = `git log --pretty=format:'{"commit": "%H", "author": "%aN <%aE>", "date": "%ad", "message": "%s"}' ${commitSha} -n 1`;
 
     try {
@@ -46,7 +51,7 @@ export class GitOperations {
     }
   }
 
-  private convertGitStatusToType(typeChar: string) {
+  private convertGitStatusToType(typeChar: string): 'edit' | 'create' | 'delete' | 'untracked' {
     switch (typeChar) {
       case 'A':
         return 'create';
