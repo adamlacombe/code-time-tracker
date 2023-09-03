@@ -1,33 +1,9 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { Event, EventEmitter, TextDocumentContentProvider, Uri } from 'vscode';
 import { GitOperations } from './git';
 import { TimerState } from './interfaces';
 import { StateOperations } from './state-manager';
 import { TimerOperations } from './timer';
-
-class TimerDataProvider implements TextDocumentContentProvider {
-  private _onDidChange = new EventEmitter<Uri>();
-  private context: vscode.ExtensionContext;
-
-  constructor(context: vscode.ExtensionContext) {
-    this.context = context;
-  }
-
-  get onDidChange(): Event<Uri> {
-    return this._onDidChange.event;
-  }
-
-  provideTextDocumentContent(uri: Uri): string {
-    return JSON.stringify(this.context.workspaceState.get<TimerState[]>('timerState', []), null, 2);
-  }
-
-  update(uri: Uri) {
-    this._onDidChange.fire(uri);
-  }
-}
-
-
 
 export function activate(context: vscode.ExtensionContext) {
   const workspacePath = vscode.workspace.workspaceFolders![0].uri.path;
@@ -76,23 +52,7 @@ export function activate(context: vscode.ExtensionContext) {
   }));
 
   // Register the showData command
-  const timerDataProvider = new TimerDataProvider(context);
-  const providerRegistration = vscode.workspace.registerTextDocumentContentProvider(
-    'code-time-tracker',
-    timerDataProvider
-  );
-  const disposable = vscode.commands.registerCommand('code-time-tracker.showData', async () => {
-    const uri = Uri.parse('code-time-tracker://authority/timer-data');
-
-    vscode.workspace.openTextDocument(uri).then((doc) => {
-      vscode.languages.setTextDocumentLanguage(doc, 'json');
-      vscode.window.showTextDocument(doc, { preview: false });
-    });
-
-    timerDataProvider.update(uri);
-  });
-  context.subscriptions.push(disposable, providerRegistration);
-
+  registerShowDataCommand(context);
 
   // File watchers and event handlers
   vscode.workspace.onDidChangeTextDocument((event) => {
@@ -143,4 +103,42 @@ export function activate(context: vscode.ExtensionContext) {
       timerOps.resetTimer(context, timerStatusBarItem);  // Resetting the timer
     }
   }, 30 * 1000);
+}
+
+
+function registerShowDataCommand(context: vscode.ExtensionContext) {
+  class TimerDataProvider implements vscode.TextDocumentContentProvider {
+    private _onDidChange = new vscode.EventEmitter<vscode.Uri>();
+
+    constructor(private context: vscode.ExtensionContext) { }
+
+    get onDidChange(): vscode.Event<vscode.Uri> {
+      return this._onDidChange.event;
+    }
+
+    provideTextDocumentContent(uri: vscode.Uri): string {
+      return JSON.stringify(context.workspaceState.get<TimerState[]>('timerState', []), null, 2);
+    }
+
+    update(uri: vscode.Uri) {
+      this._onDidChange.fire(uri);
+    }
+  }
+
+  const timerDataProvider = new TimerDataProvider(context);
+  const providerRegistration = vscode.workspace.registerTextDocumentContentProvider(
+    'code-time-tracker',
+    timerDataProvider
+  );
+  const disposable = vscode.commands.registerCommand('code-time-tracker.showData', async () => {
+    const uri = vscode.Uri.parse('code-time-tracker://authority/timer-data');
+
+    const doc = await vscode.workspace.openTextDocument(uri);
+    vscode.languages.setTextDocumentLanguage(doc, 'json');
+    vscode.window.showTextDocument(doc, { preview: false });
+
+    timerDataProvider.update(uri);
+  });
+
+  context.subscriptions.push(disposable, providerRegistration);
 }
