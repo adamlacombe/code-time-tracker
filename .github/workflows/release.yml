@@ -24,4 +24,3 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: ${{steps.identify-package.outputs.name}}
-          token: ${{ secrets.GITHUB_TOKEN }}
